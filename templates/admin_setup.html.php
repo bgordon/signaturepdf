@@ -30,6 +30,11 @@
                         </td>
                     </tr>
                     <tr>
+                        <th class="align-top"><?php echo _("Browser PDF signing"); ?></th>
+                        <td class="text-muted"><?php echo _("Enabled"); ?></td>
+                        <td><i class="bi bi-check-square text-success"></i></td>
+                    </tr>
+                    <tr>
                         <th class="align-top">rsvg-convert</th>
                         <?php $rsvgConvert = implode(PDFSignature::isrsvgConvertInstalled()); ?>
                         <td class="text-muted"><?php echo $rsvgConvert; ?></td>
@@ -37,8 +42,8 @@
                             <?php if ($rsvgConvert): ?>
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
-                                <span class="text-danger">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> (<?php echo sprintf(_("Package %s required"), "librsvg2-bin"); ?>)
+                                <span class="text-warning">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Optional for server-side SVG conversion only"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -51,8 +56,8 @@
                             <?php if ($pdftk): ?>
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
-                                <span class="text-danger">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> (<?php echo sprintf(_("Package %s required"), "pdftk"); ?>)
+                                <span class="text-warning">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Optional for legacy server-side stamping only"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -101,16 +106,16 @@
                         </td>
                     </tr>
                     <tr>
-                        <th class="align-top">gpg</th>
-                        <?php $gpg = implode(GPGCryptography::isGpgInstalled()); ?>
-                        <td class="text-muted"><?php if ($gpg) { echo substr($gpg, 0, 18); } ?></td>
+                        <th class="align-top">OpenSSL</th>
+                        <?php $openssl = implode(GPGCryptography::isGpgInstalled()); ?>
+                        <td class="text-muted"><?php if ($openssl) { echo $openssl; } ?></td>
                         <td>
-                            <?php if ($gpg): ?>
+                            <?php if ($openssl): ?>
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
-                                <span class="text-warning">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> (<?php echo sprintf(_("Package %s missing"), "gpg"); ?>)
-                                /span>
+                                <span class="text-danger">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Required for shared-storage encryption"); ?>
+                                </span>
                             <?php endif; ?>
                         </td>
                     </tr>
