@@ -21,7 +21,9 @@ class PDFSignature
 }
 
     public function createShare($originalFile, $originFileBaseName, $duration) {
-        mkdir($this->pathHash);
+        if (!is_dir($this->pathHash)) {
+            mkdir($this->pathHash);
+        }
         $expireFile = $this->pathHash.".expire";
         file_put_contents($expireFile, $duration);
         touch($expireFile, date_format(date_modify(date_create(), file_get_contents($expireFile)), 'U'));
@@ -118,7 +120,9 @@ class PDFSignature
     }
 
     protected function unlockCompile() {
-        unlink($this->lockFile);
+        if (file_exists($this->lockFile)) {
+            unlink($this->lockFile);
+        }
     }
 
     public function compile() {
@@ -208,6 +212,14 @@ class PDFSignature
 
         rename($signedPdfFile, $finalPdf);
 
+        if (NSSCryptography::getInstance()->isEnabled()) {
+            try {
+                NSSCryptography::getInstance()->addSignature($finalPdf, 'Signed with SignaturePDF');
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+            }
+        }
+
         $signatureCount = $this->getSignatureCount();
         if ($signatureCount === null) {
             $signatureCount = count($this->getLayers());
@@ -220,6 +232,23 @@ class PDFSignature
         $this->saveShareState(array(
             'signature_count' => max(0, (int) $signatureCount),
         ));
+
+        if ($this->isEncrypted()) {
+            $this->gpg->encrypt();
+        }
+    }
+
+    public function signFinalPdf($reason) {
+        $finalPdf = $this->pathHash.'/final.pdf';
+        if ($this->isEncrypted()) {
+            $decryptFile = $this->getDecryptFile($finalPdf);
+            if (!$decryptFile || !file_exists($decryptFile)) {
+                throw new Exception('Unable to decrypt final pdf for signing');
+            }
+            copy($decryptFile, $finalPdf);
+        }
+
+        NSSCryptography::getInstance()->addSignature($finalPdf, $reason);
 
         if ($this->isEncrypted()) {
             $this->gpg->encrypt();

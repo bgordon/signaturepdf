@@ -16,13 +16,22 @@ PDF_STORAGE_PATH=/path/to/folder
 ;Declare your public domain here if you can't handle location rewriting through your reverse proxy.
 ;REVERSE_PROXY_URL=http://127.0.0.1:8080
 
-; Encryption activation (need GPG is installed)
+; Encryption activation (need PHP OpenSSL support)
 ;PDF_STORAGE_ENCRYPTION=false
 
 ;NSS3 configuration (used to sign pdf with pdfsig)
 ;NSS3_DIRECTORY=/path/to/nss3
 ;NSS3_PASSWORD="my secret password"
 ;NSS3_NICK="certificate nick"
+
+; Pure PHP/OpenSSL certificate signing (shared-hosting friendly)
+;SIGN_CERTIFICATE_FILE=/path/to/certificate.pem
+;SIGN_PRIVATE_KEY_FILE=/path/to/private-key.pem
+;SIGN_PRIVATE_KEY_PASSWORD="my private key password"
+;SIGN_EXTRA_CERTIFICATES_FILE=/path/to/ca-chain.pem
+;SIGN_CERTIFICATE_NAME="Signature PDF"
+;SIGN_CERTIFICATE_LOCATION="Hosted on shared hosting"
+;SIGN_CERTIFICATE_CONTACT_INFO="https://example.org"
 
 ; Authorize these IP to use debug mode (separate IP adresses with space ' ')
 ;ADMIN_AUTHORIZED_IP=

@@ -730,14 +730,14 @@ async function save(order) {
         for(pages of orgaPages.reverse()) {
             await merge2Pages(pdfBooklet, pdf.getPages()[pages[0] - 1], pdf.getPages()[pages[1] - 1], pageWidth, pageHeight)
         }
-        let newPDF = new Blob([await pdfBooklet.save()], {type: "application/pdf"});
+        let newPDF = new Blob([await pdfBooklet.save({ useObjectStreams: false })], {type: "application/pdf"});
 
         await download(newPDF, filename+".pdf");
         return;
     }
 
     cleanPDF(pdf);
-    let newPDF = new Blob([await pdf.save()], {type: "application/pdf"});
+    let newPDF = new Blob([await pdf.save({ useObjectStreams: false })], {type: "application/pdf"});
     await download(newPDF, filename+".pdf");
     await storeFileInCache(newPDF, filename+'.pdf');
 }

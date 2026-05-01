@@ -74,7 +74,13 @@
 <?php $loadJs = ['pdf-lib.js' => true, 'pdf.js' => true]; include('components/common.html.php'); ?>
 <script>
     var defaultFields = <?php echo json_encode(isset($METADATA_DEFAULT_FIELDS) ? $METADATA_DEFAULT_FIELDS : array()); ?>;
+    var processingCapabilities = <?php echo json_encode(array(
+        'serverOcr' => (bool) OCR::isInstalled(),
+        'browserOcr' => (bool) OCR::isBrowserAvailable(),
+        'language' => $TRANSLATION_LANGUAGE
+    )); ?>;
 </script>
+<script src="<?php echo $REVERSE_PROXY_URL; ?>/js/pdf-processing.js?<?php echo ($COMMIT) ? $COMMIT : filemtime($ROOT."/public/js/pdf-processing.js") ?>"></script>
 <script src="<?php echo $REVERSE_PROXY_URL; ?>/js/metadata.js?<?php echo ($COMMIT) ? $COMMIT : filemtime($ROOT."/public/js/metadata.js") ?>"></script>
 </body>
 </html>

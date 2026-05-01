@@ -31,7 +31,7 @@
                         <button type="submit" name="compressionType" value="low" id="lowCompressBtn" class="dropdown-item"><i class="bi bi-reception-0"></i> <?php echo _("Low compression (maximum quality)"); ?></button>
                         <button type="submit" name="compressionType" value="medium" id="mediumCompressBtn" class="dropdown-item"><i class="bi bi-reception-2"></i> <?php echo sprintf(_("%s Medium compression %s (default)"), "<strong>", "</strong>"); ?></button>
                         <button type="submit" name="compressionType" value="high" id="highCompressBtn" class="dropdown-item"><i class="bi bi-reception-4"></i> <?php echo _("High compression (minimum quality)"); ?></button>
-                        <?php if(OCR::isInstalled()): ?>
+                        <?php if(OCR::isInstalled() || OCR::isBrowserAvailable()): ?>
                         <li><hr class="dropdown-divider"></li>
                         <button type="submit" data-action="<?php echo $REVERSE_PROXY_URL; ?>/ocr" name="ocr" value="ocr" class="dropdown-item"><i class="bi bi-upc-scan"></i> <?php echo _("OCR"); ?> <small class="text-muted">Experimental</small></button>
                         <?php endif; ?>
@@ -52,13 +52,23 @@
     <?php include('components/footer.html.php'); ?>
 </div>
 
-<?php include('components/common.html.php'); ?>
+<?php $loadJs = ['pdf.js' => true, 'pdf-lib.js' => true]; include('components/common.html.php'); ?>
 <script>
     var maxSize = <?php echo $maxSize ?>;
+    var processingCapabilities = <?php echo json_encode(array(
+        'serverCompression' => (bool) Compression::isgsInstalled(),
+        'serverOcr' => (bool) OCR::isInstalled(),
+        'browserCompression' => (bool) Compression::isBrowserAvailable(),
+        'browserOcr' => (bool) OCR::isBrowserAvailable(),
+        'language' => $TRANSLATION_LANGUAGE
+    )); ?>;
     var trad = <?php echo json_encode([
-        'Your pdf is already optimized' => _("Your pdf is already optimized")
+        'Your pdf is already optimized' => _("Your pdf is already optimized"),
+        'Browser OCR fallback required' => _("Browser OCR fallback required"),
+        'Browser compression fallback required' => _("Browser compression fallback required")
     ]); ?>;
 </script>
+<script src="<?php echo $REVERSE_PROXY_URL; ?>/js/pdf-processing.js?<?php echo ($COMMIT) ? $COMMIT : filemtime($ROOT."/public/js/pdf-processing.js") ?>"></script>
 <script src="<?php echo $REVERSE_PROXY_URL; ?>/js/compress.js?<?php echo ($COMMIT) ? $COMMIT : filemtime($ROOT."/public/js/compress.js") ?>"></script>
 </body>
 </html>

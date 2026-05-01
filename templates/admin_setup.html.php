@@ -20,11 +20,11 @@
                         <th class="align-top col-3">PHP</th>
                         <td class="text-muted col-4"><?php echo 'PHP version ' . phpversion(); ?></td>
                         <td class="col-5">
-                            <?php if (version_compare(phpversion(), "5.6.0", ">=")): ?>
-                                <i class="bi bi-check-square text-success" title="<?php echo sprintf(_("Minimal version required : %s"), "5.6.0"); ?>"></i>
+                            <?php if (version_compare(phpversion(), "8.4.0", ">=")): ?>
+                                <i class="bi bi-check-square text-success" title="<?php echo sprintf(_("Tested on PHP %s"), "8.4"); ?>"></i>
                             <?php else: ?>
-                                <span class="text-danger">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo sprintf(_("Minimal version required : %s"), "5.6.0"); ?>
+                                <span class="text-warning">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo sprintf(_("Tested on PHP %s"), "8.4"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -32,6 +32,16 @@
                     <tr>
                         <th class="align-top"><?php echo _("Browser PDF signing"); ?></th>
                         <td class="text-muted"><?php echo _("Enabled"); ?></td>
+                        <td><i class="bi bi-check-square text-success"></i></td>
+                    </tr>
+                    <tr>
+                        <th class="align-top"><?php echo _("Browser PDF compression"); ?></th>
+                        <td class="text-muted"><?php echo implode(Compression::isBrowserAvailable()); ?></td>
+                        <td><i class="bi bi-check-square text-success"></i></td>
+                    </tr>
+                    <tr>
+                        <th class="align-top"><?php echo _("Browser OCR"); ?></th>
+                        <td class="text-muted"><?php echo implode(OCR::isBrowserAvailable()); ?></td>
                         <td><i class="bi bi-check-square text-success"></i></td>
                     </tr>
                     <tr>
@@ -98,9 +108,24 @@
                             <?php if ($ghostscript): ?>
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
-                                <span class="text-danger">
+                                <span class="text-warning">
                                     <i class="bi bi-exclamation-octagon-fill"></i>
-                                    (<?php echo sprintf(_("Package %s required", "ghostscript")); ?>)
+                                    <?php echo _("Optional for server-side compression only"); ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="align-top">ocrmypdf</th>
+                        <?php $ocrmypdf = implode((array) OCR::isInstalled()); ?>
+                        <td class="text-muted"><?php if ($ocrmypdf) { echo $ocrmypdf; } ?></td>
+                        <td>
+                            <?php if ($ocrmypdf): ?>
+                                <i class="bi bi-check-square text-success"></i>
+                            <?php else: ?>
+                                <span class="text-warning">
+                                    <i class="bi bi-exclamation-octagon-fill"></i>
+                                    <?php echo _("Optional for server-side OCR only"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -120,6 +145,20 @@
                         </td>
                     </tr>
                     <tr>
+                        <th class="align-top"><?php echo _("PHP certificate signer"); ?></th>
+                        <?php $phpSigner = NSSCryptography::isPhpSignerAvailable(); ?>
+                        <td class="text-muted"><?php if ($phpSigner) { echo $phpSigner; } ?></td>
+                        <td>
+                            <?php if ($phpSigner): ?>
+                                <i class="bi bi-check-square text-success"></i>
+                            <?php else: ?>
+                                <span class="text-danger">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Required for certificate signing without pdfsig/certutil"); ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
                         <th class="align-top">CertUtil</th>
                         <?php $certUtil = NSSCryptography::isCertUtilInstalled(); ?>
                         <td class="text-muted"><?php if ($certUtil) { echo $certUtil; } ?></td>
@@ -128,7 +167,7 @@
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
                                 <span class="text-warning">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> (<?php echo sprintf(_("Package %s missing"), "libnss3-tools"); ?>)
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Optional for legacy NSS/pdfsig signing only"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -142,7 +181,7 @@
                                 <i class="bi bi-check-square text-success"></i>
                             <?php else: ?>
                                 <span class="text-warning">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> (<?php echo sprintf(_("Package %s missing"), "poppler-utils"); ?>)
+                                    <i class="bi bi-exclamation-octagon-fill"></i> <?php echo _("Optional for legacy NSS/pdfsig signing only"); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
