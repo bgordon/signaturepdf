@@ -1,4 +1,5 @@
-const modalLoading = new bootstrap.Modal('#modalLoading')
+const modalLoadingElement = document.getElementById('modalLoading');
+const modalLoading = modalLoadingElement ? new bootstrap.Modal(modalLoadingElement) : null;
 
 function is_mobile() {
     return !(window.getComputedStyle(document.getElementById('is_mobile')).display === "none");
@@ -119,11 +120,17 @@ function endProcessingMode(btn) {
 }
 
 function showLoading(message) {
+    if (!modalLoadingElement || !modalLoading) {
+        return;
+    }
     document.getElementById('modalLoading').querySelector('p').innerText = message
     modalLoading.show();
 }
 
 function endLoading(message) {
+    if (!modalLoading) {
+        return;
+    }
     modalLoading.hide();
 }
 
