@@ -11,9 +11,12 @@ This fork keeps the core signing workflow compatible with classic PHP shared hos
 
 - PDF signing and multi-signature sharing are generated in the browser with `pdf-lib`
 - shared-storage encryption uses native PHP OpenSSL instead of `gpg`
-- server-side SVG conversion, OCR, compression and certificate-based digital signatures stay optional
+- certificate signing can run through a pure PHP OpenSSL + TCPDF/FPDI backend
+- OCR and compression fall back to browser processing when server binaries are unavailable
+- server-side SVG conversion stays optional
+- browser-generated PDFs are saved without object streams so the free FPDI parser can reopen them on shared hosting
 
-This means the application can still sign PDFs and run the shared-sign flow even when `pdftk`, `rsvg-convert`, `pdfsig`, `certutil` or `gpg` are unavailable.
+This means the application can still sign PDFs, run the shared-sign flow, compress PDFs and generate OCR PDFs even when `pdftk`, `rsvg-convert`, `pdfsig`, `certutil`, `ocrmypdf` or `gpg` are unavailable.
 
 ## Instances
 List of instances where you can use this software:
@@ -112,7 +115,7 @@ PDF_STORAGE_ENCRYPTION=true
 
 ### Enabling digital signature
 
-The browser signing flow works without external binaries. The optional certificate-based digital signature remains a separate feature.
+The browser signing flow works without external binaries. The optional certificate-based digital signature can run either through the legacy `pdfsig`/`certutil` stack or through the pure PHP OpenSSL backend in this fork.
 
 The digital signature depends on `pdfsig` from the poppler project (poppler-utils debian package) and `certutil` from libnss3 project (libnss3-tools debian package).
 
@@ -139,6 +142,26 @@ For example with apache on debian :
 ```
 chown www-data:www-data -R NSS_DIRECORY
 ```
+
+If you are on shared hosting and cannot install `pdfsig` / `certutil`, configure the pure PHP signer instead:
+
+```
+SIGN_CERTIFICATE_FILE=/path/to/certificate.pem
+SIGN_PRIVATE_KEY_FILE=/path/to/private-key.pem
+SIGN_PRIVATE_KEY_PASSWORD="my private key password"
+SIGN_EXTRA_CERTIFICATES_FILE=/path/to/ca-chain.pem
+SIGN_CERTIFICATE_NAME="Signature PDF"
+SIGN_CERTIFICATE_LOCATION="Shared hosting"
+SIGN_CERTIFICATE_CONTACT_INFO="https://example.org"
+```
+
+This backend uses PHP OpenSSL plus TCPDF/FPDI and does not need external signing binaries at runtime.
+
+The fork also forces browser-generated PDFs to be saved without object streams. That keeps the generated files compatible with the free FPDI parser used by the PHP signer. In practice this means:
+
+- downloaded signed PDFs can be certificate-signed on the server
+- shared-signature flows can add the final certificate signature on shared hosting
+- OCR/compression outputs generated in the browser stay compatible with the PHP signer
 
 ### Disabling the Organize Mode
 
@@ -227,8 +250,10 @@ DEBUG=1 make test
 - **ImageMagick** Image manipulation toolset: https://imagemagick.org/ (Apache-2.0)
 - **Caveat** Handwriting-style font: https://github.com/googlefonts/caveat (OFL-1.1)
 - **PDF-LIB** JavaScript library for PDF manipulation used for writing metadata: https://pdf-lib.js.org/ (MIT), we use the fork https://github.com/cantoo-scribe/pdf-lib still maintained
+- **TCPDF** Pure PHP PDF engine with OpenSSL signature support: https://tcpdf.org/ (LGPL-3.0-or-later)
+- **FPDI** Import existing PDF pages into TCPDF for pure PHP certificate signing: https://github.com/Setasign/FPDI (MIT)
+- **Tesseract.js** Browser OCR engine used when `ocrmypdf` is unavailable: https://github.com/naptha/tesseract.js (Apache-2.0)
 - **Ghostscript** GPL Ghostscript is a software suite for processing PostScript and PDF file formats (GPLv3)
-- **GPG** GnuPG allows you to encrypt and sign your data and communications (GPLv3)
 
 For testing:
 

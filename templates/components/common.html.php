@@ -11,9 +11,11 @@
 <span id="is_mobile" class="d-md-none"></span>
 <script src="<?php echo $REVERSE_PROXY_URL; ?>/vendor/bootstrap.bundle.min.js?5.3.3"></script>
 <?php if(isset($loadJs['pdf.js'])): ?>
-<script src="<?php echo $REVERSE_PROXY_URL; ?>/vendor/pdf.min.mjs?4.6.82-legacy" type="module"></script>
 <script type="module">
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '<?php echo $REVERSE_PROXY_URL; ?>/vendor/pdf.worker.min.mjs?4.6.82-legacy';
+    import * as pdfjsLib from '<?php echo $REVERSE_PROXY_URL; ?>/vendor/pdf.min.mjs?4.6.82-legacy';
+    window.pdfjsLib = pdfjsLib;
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = '<?php echo $REVERSE_PROXY_URL; ?>/vendor/pdf.worker.min.mjs?4.6.82-legacy';
+    window.dispatchEvent(new Event('pdfjs-ready'));
 </script>
 <?php endif; ?>
 <?php if(isset($loadJs['pdf-lib.js'])): ?>

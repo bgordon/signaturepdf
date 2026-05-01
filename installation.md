@@ -4,7 +4,7 @@
 
 Dependencies:
 
-- php >= 5.6
+- php >= 8.1 (tested on PHP 8.4)
 - imagemagick
 - potrace
 - ghostcript
@@ -13,12 +13,17 @@ Optional dependencies:
 
 - librsvg2-bin (rsvg-convert) for server-side SVG vectorization
 - pdftk for legacy server-side stamping
+- poppler-utils + libnss3-tools for the legacy NSS/pdfsig signer
 - gpg is no longer required in this fork
 
 Installing dependencies:
 ```
 sudo apt-get install php imagemagick potrace ghostscript locales
 ```
+
+For the pure PHP certificate-signing backend you do not need any extra server binaries. You only need the PHP OpenSSL extension plus certificate files configured in `config.ini`.
+
+This fork also saves browser-generated PDFs without object streams so the free FPDI parser can reopen them for certificate signing on shared hosting.
 
 Getting the source code:
 
@@ -121,12 +126,11 @@ The main components are:
 
 - php 8 + php-fpm
 - Nginx
-- pdftk ("manual" installation requiring openjdk8)
+- pdftk ("manual" installation requiring openjdk8, optional legacy path)
 - imagick
 - potrace
-- librsvg
-- ghostscript
-- gpg
+- librsvg (optional legacy path)
+- ghostscript (optional server-side compression)
 
 What the script does:
 

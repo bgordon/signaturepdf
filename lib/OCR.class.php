@@ -8,9 +8,13 @@ class OCR
 
         exec('ocrmypdf --version', $output, $returnCode);
 
-        if (!$output) {
+        if ($returnCode !== 0 || !$output) {
             return false;
         }
         return $output;
+    }
+
+    public static function isBrowserAvailable() {
+        return array('Tesseract.js');
     }
 }

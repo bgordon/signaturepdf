@@ -275,7 +275,7 @@ async function save() {
         pdf.getInfoDict().set(PDFName.of(label), PDFHexString.fromText(input));
     });
 
-    const newPDF = new Blob([await pdf.save()], {type: "application/pdf"});
+    const newPDF = new Blob([await pdf.save({ useObjectStreams: false })], {type: "application/pdf"});
 
     if(window.location.hash && window.location.hash.match(/^\#local/)) {
         let apiUrl = window.location.origin + "/api/file/save?path=" + window.location.hash.replace(/^\#local:/, '');
@@ -343,10 +343,36 @@ function createEventsListener() {
 
     document.getElementById('form_ocr').addEventListener('submit', async function (e) {
         const form = e.target;
-        this.querySelector('input[type="file"]').files = document.getElementById('input_pdf_upload').files;
-        const formData = new FormData(form);
         const btn = e.submitter;
         startProcessingMode(btn);
+        if (!processingCapabilities.serverOcr && processingCapabilities.browserOcr) {
+            try {
+                var currentFile = document.getElementById('input_pdf_upload').files[0];
+                var ocrBlob = await window.PDFBrowserProcessing.ocrPdfFile(currentFile, processingCapabilities.language, {
+                    onProgress: function () {}
+                });
+                var dataTransferOcr = new DataTransfer();
+                dataTransferOcr.items.add(new File([ocrBlob], currentFile.name.replace(/\.pdf$/i, '') + '_ocr.pdf', {
+                    type: 'application/pdf'
+                }));
+                document.getElementById('input_pdf_upload').files = dataTransferOcr.files;
+                await loadPDF(document.getElementById('input_pdf_upload').files[0]).catch(function (reason) {
+                    console.error(reason);
+                });
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+            } catch (error) {
+                console.error(error);
+                alert(error && error.message ? error.message : 'Browser OCR failed');
+            } finally {
+                endProcessingMode(btn);
+            }
+            e.preventDefault();
+            return false;
+        }
+
+        this.querySelector('input[type="file"]').files = document.getElementById('input_pdf_upload').files;
+        const formData = new FormData(form);
         fetch(form.action, { method: form.method, body: formData })
         .then(async function(response) {
             let pdfBlob = await response.blob();

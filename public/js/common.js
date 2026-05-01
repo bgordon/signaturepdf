@@ -255,7 +255,7 @@ async function imageToPdf(file) {
     height,
   });
 
-  const pdfBytes = await pdfDoc.save();
+  const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
 
   return new File([pdfBytes], file.name+'.pdf', {
       type: 'application/pdf'

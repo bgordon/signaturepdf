@@ -281,7 +281,7 @@ async function buildSignedPdfBlob() {
         });
     }
 
-    return new Blob([await outputDocument.save()], {
+    return new Blob([await outputDocument.save({ useObjectStreams: false })], {
         type: 'application/pdf'
     });
 }

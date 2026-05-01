@@ -8,9 +8,13 @@ class Compression
 
         exec('gs --version', $output, $returnCode);
 
-        if (!$output) {
+        if ($returnCode !== 0 || !$output) {
             return array(false);
         }
         return $output;
+    }
+
+    public static function isBrowserAvailable() {
+        return array('pdf.js + pdf-lib');
     }
 }

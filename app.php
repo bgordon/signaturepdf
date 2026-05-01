@@ -2,6 +2,7 @@
 
 setlocale(LC_ALL, "");
 require(__DIR__.'/lib/GPGCryptography.class.php');
+require(__DIR__.'/lib/PHPCertificateSigner.class.php');
 require(__DIR__.'/lib/NSSCryptography.class.php');
 require(__DIR__.'/lib/PDFSignature.class.php');
 require(__DIR__.'/lib/Image2SVG.class.php');
@@ -80,9 +81,18 @@ if($f3->get('PDF_STORAGE_ENCRYPTION') && !function_exists('openssl_encrypt')) {
     $f3->set('PDF_STORAGE_ENCRYPTION', false);
 }
 
-if ($f3->exists('NSS3_DIRECTORY') && $f3->exists('NSS3_PASSWORD') && $f3->exists('NSS3_NICK')) {
-    NSSCryptography::getInstance($f3->get('NSS3_DIRECTORY'), $f3->get('NSS3_PASSWORD'), $f3->get('NSS3_NICK'));
-}
+NSSCryptography::getInstance(
+    $f3->get('NSS3_DIRECTORY'),
+    $f3->get('NSS3_PASSWORD'),
+    $f3->get('NSS3_NICK'),
+    $f3->get('SIGN_CERTIFICATE_FILE'),
+    ($f3->get('SIGN_PRIVATE_KEY_FILE') ?: $f3->get('SIGN_CERTIFICATE_FILE')),
+    $f3->get('SIGN_PRIVATE_KEY_PASSWORD'),
+    $f3->get('SIGN_EXTRA_CERTIFICATES_FILE'),
+    $f3->get('SIGN_CERTIFICATE_NAME'),
+    $f3->get('SIGN_CERTIFICATE_LOCATION'),
+    $f3->get('SIGN_CERTIFICATE_CONTACT_INFO')
+);
 
 
 $domain = basename(glob($f3->get('ROOT')."/locale/application_*.pot")[0], '.pot');
@@ -238,6 +248,13 @@ $f3->route('POST /sign',
 
         if(!is_file($tmpfile.".pdf")) {
             if(is_file($tmpfile."_signed.pdf")) {
+                if (NSSCryptography::getInstance()->isEnabled()) {
+                    try {
+                        NSSCryptography::getInstance()->addSignature($tmpfile."_signed.pdf", 'Signed with SignaturePDF');
+                    } catch (Exception $e) {
+                        error_log($e->getMessage());
+                    }
+                }
                 Web::instance()->send($tmpfile."_signed.pdf", null, 0, TRUE, $filename);
 
                 if($f3->get('DEBUG')) {
@@ -321,6 +338,13 @@ $f3->route('POST /share',
         $pdfSignature->createShare($originalFile, $originalFileBaseName, $f3->get('POST.duration'));
         if ($f3->exists('POST.signature_count')) {
             $pdfSignature->setSignatureCount((int) $f3->get('POST.signature_count'));
+        }
+        if ((int) $f3->get('POST.signature_count') > 0 && NSSCryptography::getInstance()->isEnabled()) {
+            try {
+                $pdfSignature->signFinalPdf('Signed with SignaturePDF');
+            } catch (Exception $e) {
+                error_log($e->getMessage());
+            }
         }
         if(count($svgFiles)) {
             $pdfSignature->addSignature($svgFiles);
@@ -496,6 +520,13 @@ $f3->route ('POST /ocr',
         $filePath = reset(array_keys($files));
         $outputFileName = str_replace(".pdf", "_ocr.pdf", $filePath);
 
+        if (!OCR::isInstalled()) {
+            http_response_code("501");
+            header('Content-Type: text/plain');
+            echo _("Browser OCR fallback required");
+            return;
+        }
+
         $returnCode = shell_exec(sprintf("ocrmypdf --force-ocr %s %s", $filePath, $outputFileName));
 
         if ($returnCode === false || !file_exists($outputFileName)) {
@@ -561,6 +592,13 @@ $f3->route ('POST /compress',
         $filePath = reset(array_keys($files));
 
         $outputFileName = str_replace(".pdf", "_compressed.pdf", $filePath);
+
+        if (!Compression::isgsInstalled()) {
+            http_response_code("501");
+            header('Content-Type: text/plain');
+            echo _("Browser compression fallback required");
+            return;
+        }
 
         $returnCode = shell_exec(sprintf("gs -sDEVICE=pdfwrite -dPDFSETTINGS=%s -dPassThroughJPEGImages=false -dPassThroughJPXImages=false -dAutoFilterGrayImages=false -dAutoFilterColorImages=false -dDetectDuplicateImages=true -dAutoRotatePages=/None -dQUIET -dBATCH -o %s %s", $compressionType, $outputFileName, $filePath));
 
