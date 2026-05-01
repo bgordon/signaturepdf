@@ -211,6 +211,92 @@ async function reloadPDF(url) {
     });
 }
 
+function createSignedFilename(filename) {
+    if (!filename) {
+        return 'signed.pdf';
+    }
+
+    return filename.replace(/\.pdf$/i, '_signe.pdf');
+}
+
+function canvasToBlobPromise(canvas, type, quality) {
+    return new Promise(function(resolve, reject) {
+        if (!canvas.toBlob) {
+            resolve(dataURLtoBlob(canvas.toDataURL(type || 'image/png')));
+            return;
+        }
+        canvas.toBlob(function(blob) {
+            if (!blob) {
+                reject(new Error('Unable to create canvas blob'));
+                return;
+            }
+            resolve(blob);
+        }, type || 'image/png', quality || 0.92);
+    });
+}
+
+async function buildSignedPdfBlob() {
+    var uploadInput = document.getElementById('input_pdf_upload');
+    if (!uploadInput || !uploadInput.files.length) {
+        throw new Error('PDF file missing');
+    }
+
+    var sourceFile = uploadInput.files[0];
+    var sourceBytes = await sourceFile.arrayBuffer();
+    var sourceDocument = await PDFLib.PDFDocument.load(sourceBytes);
+    var outputDocument = await PDFLib.PDFDocument.create();
+    var sourcePages = sourceDocument.getPages();
+    var pageIndex = 0;
+
+    for (pageIndex = 0; pageIndex < sourcePages.length; pageIndex++) {
+        var sourcePage = sourcePages[pageIndex];
+        var pageSize = sourcePage.getSize();
+        var pdfCanvas = document.getElementById('canvas-pdf-' + pageIndex);
+        var mergedCanvas = document.createElement('canvas');
+        var mergedContext = mergedCanvas.getContext('2d');
+        var overlayCanvas = canvasEditions[pageIndex].lowerCanvasEl;
+        var overlayWidth = overlayCanvas.width || pdfCanvas.width;
+        var overlayHeight = overlayCanvas.height || pdfCanvas.height;
+        var outputScale = currentScale > 1 ? (1 / currentScale) : 1;
+
+        canvasEditions[pageIndex].discardActiveObject();
+        canvasEditions[pageIndex].renderAll();
+
+        mergedCanvas.width = Math.max(1, Math.round(pdfCanvas.width * outputScale));
+        mergedCanvas.height = Math.max(1, Math.round(pdfCanvas.height * outputScale));
+        mergedContext.fillStyle = '#ffffff';
+        mergedContext.fillRect(0, 0, mergedCanvas.width, mergedCanvas.height);
+        mergedContext.drawImage(pdfCanvas, 0, 0, mergedCanvas.width, mergedCanvas.height);
+        mergedContext.drawImage(overlayCanvas, 0, 0, overlayWidth, overlayHeight, 0, 0, mergedCanvas.width, mergedCanvas.height);
+
+        var imageBlob = await canvasToBlobPromise(mergedCanvas, 'image/jpeg', 0.45);
+        var imageBytes = await imageBlob.arrayBuffer();
+        var image = await outputDocument.embedJpg(imageBytes);
+        var outputPage = outputDocument.addPage([pageSize.width, pageSize.height]);
+        outputPage.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: pageSize.width,
+            height: pageSize.height
+        });
+    }
+
+    return new Blob([await outputDocument.save()], {
+        type: 'application/pdf'
+    });
+}
+
+async function prepareSignedPdfInput(inputId, filename) {
+    var blob = await buildSignedPdfBlob();
+    var dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File([blob], filename, {
+        type: 'application/pdf'
+    }));
+    document.getElementById(inputId).files = dataTransfer.files;
+
+    return dataTransfer.files[0];
+}
+
 function responsiveDisplay() {
     if(is_mobile()) {
         document.getElementById('page-signature').classList.remove('decalage-pdf-div');
@@ -1054,65 +1140,57 @@ function createEventsListener() {
 
     if(document.getElementById('save')) {
         document.getElementById('save').addEventListener('click', async function(event) {
-            if(!pdfHash) {
-                event.preventDefault()
-            }
+            event.preventDefault();
 
-            let previousScale = currentScale;
-            if(currentScale != defaultScale) {
-                resizePDF(defaultScale)
-                while(!renderComplete) { }
-            }
-            let dataTransfer = new DataTransfer();
-            canvasEditions.forEach(function(canvasEdition, index) {
-                dataTransfer.items.add(new File([canvasEdition.toSVG()], index+'.svg', {
-                    type: 'image/svg+xml'
-                }));
-            })
-            document.getElementById('input_svg').files = dataTransfer.files;
-            if(previousScale != currentScale) {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(resizePDF(previousScale), 100);
-            }
+            startProcessingMode(this);
+            try {
+                var targetFilename = createSignedFilename(document.querySelector('#text_document_name').title);
 
-            if(!pdfHash) {
-                startProcessingMode(this)
-                const formData = new FormData(this.form)
-                const response = await fetch(this.form.action, {
-                    method: "POST",
-                    body: formData
-                })
+                if(!pdfHash) {
+                    var localBlob = await buildSignedPdfBlob();
+                    await download(localBlob, targetFilename);
+                    await storeFileInCache(localBlob, document.getElementById('input_pdf_upload').files[0].name);
+                } else {
+                    await prepareSignedPdfInput('input_signed_pdf', targetFilename);
+                    var formData = new FormData(this.form);
+                    var response = await fetch(this.form.action, {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                const blob = await response.blob()
-                await download(blob, document.querySelector('#text_document_name').title.replace(/\.pdf$/, '_signe.pdf'))
-                await storeFileInCache(blob, formData.get('pdf').name)
-                endProcessingMode(this)
+                    if (!response.ok) {
+                        throw new Error('Unable to save signed PDF');
+                    }
+
+                    document.location = document.location.href;
+                    return;
+                }
+
+                hasModifications = false;
+            } finally {
+                endProcessingMode(this);
             }
-
-            hasModifications = false;
         });
     }
 
     if(document.getElementById('save_share')) {
-        document.getElementById('save_share').addEventListener('click', function(event) {
-            let dataTransfer = new DataTransfer();
-            if(!document.getElementById('save').hasAttribute('disabled')) {
-                canvasEditions.forEach(function(canvasEdition, index) {
-                    dataTransfer.items.add(new File([canvasEdition.toSVG()], index+'.svg', {
-                        type: 'image/svg+xml'
-                    }));
-                })
-            }
-            document.getElementById('input_svg_share').files = dataTransfer.files;
-            hasModifications = false;
-
-
+        document.getElementById('save_share').addEventListener('click', async function(event) {
+            event.preventDefault();
             document.getElementById('input_pdf_hash').value = generatePdfHash();
+            document.getElementById('input_signature_count').value = '0';
 
             if (document.getElementById('checkbox_encryption').checked) {
                 storeSymmetricKeyCookie(document.getElementById('input_pdf_hash').value, generateSymmetricKey());
             }
+            document.getElementById('input_svg_share').files = new DataTransfer().files;
+            if(!document.getElementById('save').hasAttribute('disabled')) {
+                startProcessingMode(this);
+                await prepareSignedPdfInput('input_signed_pdf_share', createSignedFilename(document.querySelector('#text_document_name').title));
+                document.getElementById('input_signature_count').value = '1';
+                hasModifications = false;
+            }
 
+            this.form.submit();
         });
     }
 

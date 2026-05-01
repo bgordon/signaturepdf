@@ -76,7 +76,7 @@ if (!$f3->exists('PDF_STORAGE_ENCRYPTION')) {
     $f3->set('PDF_STORAGE_ENCRYPTION', false);
 }
 
-if($f3->get('PDF_STORAGE_ENCRYPTION') && !GPGCryptography::isGpgInstalled()) {
+if($f3->get('PDF_STORAGE_ENCRYPTION') && !function_exists('openssl_encrypt')) {
     $f3->set('PDF_STORAGE_ENCRYPTION', false);
 }
 
@@ -174,12 +174,23 @@ $f3->route('POST /image2svg',
             $f3->error(403);
         }
 
-        shell_exec(sprintf("convert -background white -flatten %s %s", $imageFile, $imageFile.".bmp"));
-        shell_exec(sprintf("mkbitmap -x -f 8 %s -o %s", $imageFile.".bmp", $imageFile.".bpm"));
-        shell_exec(sprintf("potrace --flat --svg %s -o %s", $imageFile.".bpm", $imageFile.".svg"));
-
         header('Content-Type: image/svg+xml');
-        echo file_get_contents($imageFile.".svg");
+        if (Image2SVG::isimageMagickInstalled() && Image2SVG::ispotraceInstalled()) {
+            shell_exec(sprintf("convert -background white -flatten %s %s", escapeshellarg($imageFile), escapeshellarg($imageFile.".bmp")));
+            shell_exec(sprintf("mkbitmap -x -f 8 %s -o %s", escapeshellarg($imageFile.".bmp"), escapeshellarg($imageFile.".bpm")));
+            shell_exec(sprintf("potrace --flat --svg %s -o %s", escapeshellarg($imageFile.".bpm"), escapeshellarg($imageFile.".svg")));
+            echo file_get_contents($imageFile.".svg");
+        } else {
+            $imageInfos = getimagesize($imageFile);
+            $mimeType = isset($imageInfos['mime']) ? $imageInfos['mime'] : 'image/png';
+            $width = isset($imageInfos[0]) ? (int) $imageInfos[0] : 1;
+            $height = isset($imageInfos[1]) ? (int) $imageInfos[1] : 1;
+            $imageData = base64_encode(file_get_contents($imageFile));
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+                .'<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'" viewBox="0 0 '.$width.' '.$height.'">'
+                .'<image width="'.$width.'" height="'.$height.'" href="data:'.$mimeType.';base64,'.$imageData.'" />'
+                .'</svg>';
+        }
 
         if($f3->get('DEBUG')) {
             return;
@@ -203,12 +214,19 @@ $f3->route('POST /sign',
             if($formFieldName == "svg" && strpos(Web::instance()->mime($file['tmp_name'], true), 'image/svg+xml') !== 0) {
                 $f3->error(403);
             }
+            if($formFieldName == "signed_pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
+                $f3->error(403);
+            }
 
             return true;
         }, false, function($fileBaseName, $formFieldName) use ($f3, $tmpfile, &$filename, &$svgFiles) {
             if($formFieldName == "pdf") {
                 $filename = str_replace(".pdf", "_signe.pdf", $fileBaseName);
                 return basename($tmpfile).".pdf";
+            }
+            if($formFieldName == "signed_pdf") {
+                $filename = str_replace(".pdf", "_signe.pdf", $fileBaseName);
+                return basename($tmpfile)."_signed.pdf";
             }
 
             if($formFieldName == "svg") {
@@ -219,6 +237,15 @@ $f3->route('POST /sign',
 	    });
 
         if(!is_file($tmpfile.".pdf")) {
+            if(is_file($tmpfile."_signed.pdf")) {
+                Web::instance()->send($tmpfile."_signed.pdf", null, 0, TRUE, $filename);
+
+                if($f3->get('DEBUG')) {
+                    return;
+                }
+                array_map('unlink', glob($tmpfile."*"));
+                return;
+            }
             $f3->error(403);
         }
 
@@ -266,10 +293,17 @@ $f3->route('POST /share',
             if($formFieldName == "svg" && strpos(Web::instance()->mime($file['tmp_name'], true), 'image/svg+xml') !== 0) {
                 $f3->error(403);
             }
+            if($formFieldName == "signed_pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
+                $f3->error(403);
+            }
 
             return true;
         }, false, function($fileBaseName, $formFieldName) use ($tmpfile, $originalFile, &$svgFiles, &$originalFileBaseName) {
                 if($formFieldName == "pdf") {
+                    $originalFileBaseName = $fileBaseName;
+                    return basename($originalFile);
+                }
+                if($formFieldName == "signed_pdf") {
                     $originalFileBaseName = $fileBaseName;
                     return basename($originalFile);
                 }
@@ -285,6 +319,9 @@ $f3->route('POST /share',
 
         $pdfSignature = new PDFSignature($f3->get('PDF_STORAGE_PATH').$hash, $symmetricKey);
         $pdfSignature->createShare($originalFile, $originalFileBaseName, $f3->get('POST.duration'));
+        if ($f3->exists('POST.signature_count')) {
+            $pdfSignature->setSignatureCount((int) $f3->get('POST.signature_count'));
+        }
         if(count($svgFiles)) {
             $pdfSignature->addSignature($svgFiles);
         }
@@ -361,18 +398,26 @@ $f3->route('POST /signature/@hash/save',
             if($formFieldName == "svg" && strpos(Web::instance()->mime($file['tmp_name'], true), 'image/svg+xml') !== 0) {
                 $f3->error(403);
             }
+            if($formFieldName == "signed_pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
+                $f3->error(403);
+            }
             return true;
         }, false, function($fileBaseName, $formFieldName) use ($f3, $tmpfile, &$svgFiles) {
             if($formFieldName == "svg") {
                 $svgFiles[] = $tmpfile."_".$fileBaseName;
                 return basename($tmpfile."_".$fileBaseName);
             }
+            if($formFieldName == "signed_pdf") {
+                return basename($tmpfile.'_signed.pdf');
+            }
 	    });
-        if(!count($svgFiles)) {
+        if(is_file($tmpfile.'_signed.pdf')) {
+            $pdfSignature->addSignedPdf($tmpfile.'_signed.pdf');
+        } elseif(count($svgFiles)) {
+            $pdfSignature->addSignature($svgFiles);
+        } else {
             $f3->error(403);
         }
-
-        $pdfSignature->addSignature($svgFiles);
 
         if(!$f3->get('DEBUG')) {
             $pdfSignature->clean();
@@ -390,7 +435,11 @@ $f3->route('GET /signature/@hash/nblayers',
         $hash = Web::instance()->slug($f3->get('PARAMS.hash'));
         $symmetricKey = (isset($_COOKIE[$hash])) ? GPGCryptography::protectSymmetricKey($_COOKIE[$hash]) : null;
         $pdfSignature = new PDFSignature($f3->get('PDF_STORAGE_PATH').$hash, $symmetricKey);
-        echo count($pdfSignature->getLayers());
+        $signatureCount = $pdfSignature->getSignatureCount();
+        if ($signatureCount === null) {
+            $signatureCount = count($pdfSignature->getLayers());
+        }
+        echo $signatureCount;
     }
 );
 

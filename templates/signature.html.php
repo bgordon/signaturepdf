@@ -111,6 +111,7 @@
                   <form id="form_pdf" action="<?php echo $REVERSE_PROXY_URL; ?>/sign" method="post" enctype="multipart/form-data" class="d-none d-sm-none d-md-block">
                         <input id="input_pdf" name="pdf" type="file" class="d-none" />
                         <input id="input_svg" name="svg[]" type="file" class="d-none" />
+                        <input id="input_signed_pdf" name="signed_pdf" type="file" class="d-none" />
                         <input name="flatten" type="checkbox" value="1" class="d-none" />
                         <button class="btn btn-primary w-100 mt-2 w-100" disabled="disabled" type="submit" id="save"><i class="bi bi-download"></i> <?php echo _("Download the signed PDF"); ?> <i id="save_flatten_indicator" class="bi bi-layers-half opacity-50 float-end invisible" title="<?php echo _("The PDF will be flattened") ?>"></i></button>
                 </form>
@@ -123,11 +124,12 @@
                       <a id="btn_download" class="btn btn-outline-dark w-100" href="<?php echo $REVERSE_PROXY_URL; ?>/signature/<?php echo $hash ?>/pdf"><?php echo sprintf(_("%s Download the PDF"), '<i class="bi bi-download"></i>'); ?></a>
                       <button class="btn btn-outline-dark" type="button" id="btn_share" data-bs-toggle="modal" data-bs-target="#modal-share-informations"><i class="bi bi-share"></i></button>
                   </div>
-                  <form id="form_pdf" action="<?php echo $REVERSE_PROXY_URL; ?>/signature/<?php echo $hash ?>/save" method="post" enctype="multipart/form-data" class="d-none d-sm-none d-md-block">
-                        <input id="input_svg" name="svg[]" type="file" class="d-none" />
+	                  <form id="form_pdf" action="<?php echo $REVERSE_PROXY_URL; ?>/signature/<?php echo $hash ?>/save" method="post" enctype="multipart/form-data" class="d-none d-sm-none d-md-block">
+	                        <input id="input_svg" name="svg[]" type="file" class="d-none" />
+                            <input id="input_signed_pdf" name="signed_pdf" type="file" class="d-none" />
 
-                        <button class="btn btn-primary w-100 mt-2" disabled="disabled" type="submit" id="save"><i class="bi bi-cloud-upload"></i> <?php echo _("Transmit my signature"); ?></button>
-                  </form>
+	                        <button class="btn btn-primary w-100 mt-2" disabled="disabled" type="submit" id="save"><i class="bi bi-cloud-upload"></i> <?php echo _("Transmit my signature"); ?></button>
+	                  </form>
                   <?php endif; ?>
               </div>
             </div>
@@ -266,12 +268,14 @@
                     <?php endif; ?>
                 </div>
                 <div class="modal-footer text-center d-block">
-                    <form id="form_sharing" clas action="<?php echo $REVERSE_PROXY_URL; ?>/share" method="post" enctype="multipart/form-data">
-                          <input id="input_pdf_share" name="pdf" type="file" class="d-none" />
-                          <input id="input_svg_share" name="svg[]" type="file" class="d-none" />
-                          <input id="input_pdf_hash" name="hash" type="hidden" value="" />
-                          <button  class="btn col-9 col-md-6 btn-primary" type="submit" id="save_share"><?php echo sprintf(_("%s Start sharing"), '<i class="bi bi-cloud-upload"></i>'); ?></button>
-                    </form>
+	                    <form id="form_sharing" clas action="<?php echo $REVERSE_PROXY_URL; ?>/share" method="post" enctype="multipart/form-data">
+	                          <input id="input_pdf_share" name="pdf" type="file" class="d-none" />
+	                          <input id="input_svg_share" name="svg[]" type="file" class="d-none" />
+                              <input id="input_signed_pdf_share" name="signed_pdf" type="file" class="d-none" />
+	                          <input id="input_pdf_hash" name="hash" type="hidden" value="" />
+                              <input id="input_signature_count" name="signature_count" type="hidden" value="0" />
+	                          <button  class="btn col-9 col-md-6 btn-primary" type="submit" id="save_share"><?php echo sprintf(_("%s Start sharing"), '<i class="bi bi-cloud-upload"></i>'); ?></button>
+	                    </form>
                 </div>
             </div>
         </div>
@@ -337,7 +341,7 @@
         <div class="toolbox-action" data-action="delete" title="<?php echo _("Delete the element") ?>"><i class="bi bi-trash3"></i></div>
     </template>
 
-    <?php $loadJs = ['pdf.js' => true]; include('components/common.html.php'); ?>
+	    <?php $loadJs = ['pdf.js' => true, 'pdf-lib.js' => true]; include('components/common.html.php'); ?>
     <script src="<?php echo $REVERSE_PROXY_URL; ?>/vendor/fabric.min.js?5.4.0"></script>
     <script src="<?php echo $REVERSE_PROXY_URL; ?>/vendor/signature_pad.umd.min.js?5.0.3"></script>
     <script src="<?php echo $REVERSE_PROXY_URL; ?>/vendor/opentype.min.js?1.3.4"></script>

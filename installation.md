@@ -5,16 +5,19 @@
 Dependencies:
 
 - php >= 5.6
-- librsvg2-bin (rsvg-convert)
-- pdftk
 - imagemagick
 - potrace
 - ghostcript
-- gpg
+
+Optional dependencies:
+
+- librsvg2-bin (rsvg-convert) for server-side SVG vectorization
+- pdftk for legacy server-side stamping
+- gpg is no longer required in this fork
 
 Installing dependencies:
 ```
-sudo apt-get install php librsvg2-bin pdftk imagemagick potrace ghostscript locales gpg
+sudo apt-get install php imagemagick potrace ghostscript locales
 ```
 
 Getting the source code:
@@ -92,7 +95,7 @@ The following variables can be used to configure the deployment:
 | `DISABLE_ORGANIZATION` | Disable the Organize route                                            | true                             | false       |
 | `PDF_DEMO_LINK`        | Show, hide, or change the demo PDF link                               | false, `link` or `relative path` | true        |
 | `DEFAULT_LANGUAGE`     | Default language for the application                                  | en_US.UTF-8                      | fr_FR.UTF-8 |
-| `PDF_STORAGE_ENCRYPTION`     | Activate PDF storage encryption option (GPG needs to be installed)   | true                      | false |
+| `PDF_STORAGE_ENCRYPTION`     | Activate PDF storage encryption option (requires PHP OpenSSL extension)   | true                      | false |
 
 ```bash
 docker run -d --name=signaturepdf -p 8080:80 -e SERVERNAME=pdf.example.org -e UPLOAD_MAX_FILESIZE=48M -e POST_MAX_SIZE=48M -e MAX_FILE_UPLOADS=401 -e PDF_STORAGE_PATH=/data signaturepdf

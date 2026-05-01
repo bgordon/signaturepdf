@@ -2,6 +2,8 @@
 
 class PDFSignature
 {
+    const SHARE_STATE_FILE = '/share.json';
+
     protected $symmetricKey = null;
     protected $pathHash = null;
     protected $hash = null;
@@ -25,6 +27,10 @@ class PDFSignature
         touch($expireFile, date_format(date_modify(date_create(), file_get_contents($expireFile)), 'U'));
         rename($originalFile, $this->pathHash.'/original.pdf');
         file_put_contents($this->pathHash.'/filename.txt', $originFileBaseName);
+        copy($this->pathHash.'/original.pdf', $this->pathHash.'/final.pdf');
+        $this->saveShareState(array(
+            'signature_count' => 0,
+        ));
         if($this->symmetricKey) {
             $this->gpg->encrypt();
         }
@@ -56,7 +62,7 @@ class PDFSignature
 
             return $file;
         }
-        $file = preg_replace("/\.gpg$/", "", $file);
+        $file = preg_replace("/\.(gpg|enc)$/", "", $file);
         if(file_exists($file)) {
             return $file;
         }
@@ -72,11 +78,17 @@ class PDFSignature
     }
 
     public function getPDF() {
+        if (file_exists($this->pathHash.'/final.pdf') || file_exists($this->pathHash.'/final.pdf'.GPGCryptography::ENCRYPTED_EXTENSION)) {
+            return $this->getDecryptFile($this->pathHash.'/final.pdf');
+        }
         $this->compile();
         return $this->getDecryptFile($this->pathHash.'/final.pdf');
     }
 
     public function needToCompile() {
+        if ($this->getSignatureCount() !== null) {
+            return false;
+        }
         $needToCompile = false;
         foreach($this->getLayers() as $layerFile) {
             if(!file_exists(str_replace('.svg.pdf', '.sign.pdf', $layerFile))) {
@@ -140,6 +152,80 @@ class PDFSignature
         $this->unlockCompile();
     }
 
+    protected function getShareStateFile() {
+        return $this->pathHash.self::SHARE_STATE_FILE;
+    }
+
+    protected function getShareState() {
+        $shareStateFile = $this->getDecryptFile($this->getShareStateFile());
+        if (!$shareStateFile || !file_exists($shareStateFile)) {
+            return null;
+        }
+        $state = json_decode(file_get_contents($shareStateFile), true);
+        if (!is_array($state)) {
+            return null;
+        }
+
+        return $state;
+    }
+
+    protected function saveShareState(array $state) {
+        file_put_contents($this->getShareStateFile(), json_encode($state));
+    }
+
+    public function getSignatureCount() {
+        $state = $this->getShareState();
+        if (!is_array($state) || !array_key_exists('signature_count', $state)) {
+            return null;
+        }
+
+        return (int) $state['signature_count'];
+    }
+
+    public function setSignatureCount($count) {
+        $state = $this->getShareState();
+        if (!is_array($state)) {
+            $state = array();
+        }
+        $state['signature_count'] = max(0, (int) $count);
+        $this->saveShareState($state);
+        if ($this->isEncrypted()) {
+            $this->gpg->encrypt();
+        }
+    }
+
+    public function addSignedPdf($signedPdfFile, $incrementCount = true, $setCount = null) {
+        $expireFile = $this->pathHash.".expire";
+        touch($expireFile, date_format(date_modify(date_create(), file_get_contents($expireFile)), 'U'));
+
+        $finalPdf = $this->pathHash.'/final.pdf';
+        if (file_exists($finalPdf)) {
+            unlink($finalPdf);
+        }
+        if (file_exists($finalPdf.GPGCryptography::ENCRYPTED_EXTENSION)) {
+            unlink($finalPdf.GPGCryptography::ENCRYPTED_EXTENSION);
+        }
+
+        rename($signedPdfFile, $finalPdf);
+
+        $signatureCount = $this->getSignatureCount();
+        if ($signatureCount === null) {
+            $signatureCount = count($this->getLayers());
+        }
+        if ($setCount !== null) {
+            $signatureCount = (int) $setCount;
+        } elseif ($incrementCount) {
+            $signatureCount++;
+        }
+        $this->saveShareState(array(
+            'signature_count' => max(0, (int) $signatureCount),
+        ));
+
+        if ($this->isEncrypted()) {
+            $this->gpg->encrypt();
+        }
+    }
+
     public function getPublicFilename() {
         $filename = $this->hash.'.pdf';
 
@@ -149,7 +235,12 @@ class PDFSignature
             $filename = file_get_contents($file);
         }
 
-        $filename = str_replace('.pdf', '_signe-'.count($this->getLayers()).'x.pdf', $filename);
+        $signatureCount = $this->getSignatureCount();
+        if ($signatureCount === null) {
+            $signatureCount = count($this->getLayers());
+        }
+
+        $filename = str_replace('.pdf', '_signe-'.$signatureCount.'x.pdf', $filename);
 
         return $filename;
     }

@@ -5,6 +5,16 @@
 
 Free web software for signing (alone or with others), organizing (merge, sort, rotate, delete, extract pages, ...), editing metadatas or compressing PDFs.
 
+## Shared-hosting compatibility
+
+This fork keeps the core signing workflow compatible with classic PHP shared hosting such as All-Inkl:
+
+- PDF signing and multi-signature sharing are generated in the browser with `pdf-lib`
+- shared-storage encryption uses native PHP OpenSSL instead of `gpg`
+- server-side SVG conversion, OCR, compression and certificate-based digital signatures stay optional
+
+This means the application can still sign PDFs and run the shared-sign flow even when `pdftk`, `rsvg-convert`, `pdfsig`, `certutil` or `gpg` are unavailable.
+
 ## Instances
 List of instances where you can use this software:
 - [pdf.24eme.fr](https://pdf.24eme.fr) (by [24eme](https://www.24eme.fr/services-libres/))
@@ -92,7 +102,7 @@ chown www-data /path/to/folder/to/store/pdf
 
 You can enable PDFs to be stored encrypted on the server with a symmetric key known only to the signers.
 
-To activate it, gpg needs to be installed and option PDF_STORAGE_ENCRYPTION must be set to true.
+In this fork, encryption uses native PHP OpenSSL. No `gpg` binary is required.
 
 In the `config/config.ini` file :
 
@@ -101,6 +111,8 @@ PDF_STORAGE_ENCRYPTION=true
 ```
 
 ### Enabling digital signature
+
+The browser signing flow works without external binaries. The optional certificate-based digital signature remains a separate feature.
 
 The digital signature depends on `pdfsig` from the poppler project (poppler-utils debian package) and `certutil` from libnss3 project (libnss3-tools debian package).
 
