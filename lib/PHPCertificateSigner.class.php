@@ -255,6 +255,11 @@ class PHPCertificateSigner
 
     private static function loadLibraries()
     {
+        // TCPDF 6.11.4 announces its successor tc-lib-pdf on every run; the 6.x API is what FPDI needs
+        if (!defined('TCPDF_SILENCE_DEPRECATION')) {
+            define('TCPDF_SILENCE_DEPRECATION', true);
+        }
+
         $tcpdf = __DIR__ . '/../vendor/tecnickcom/TCPDF/tcpdf.php';
         $fpdiAutoload = __DIR__ . '/../vendor/setasign/fpdi/src/autoload.php';
 
