@@ -12,6 +12,8 @@
  *   'signature_image_data' PNG binary) without temporary files.
  * - ensureSelfSignedCertificate() creates a self-signed RSA certificate when
  *   none is configured yet.
+ * - 'digital_signature' => false only stamps the visible signature image
+ *   (fallback when no certificate is available).
  */
 class PHPCertificateSigner
 {
@@ -128,13 +130,14 @@ class PHPCertificateSigner
         $certificateFile = isset($options['certificate_file']) ? (string) $options['certificate_file'] : '';
         $privateKeyFile = isset($options['private_key_file']) ? (string) $options['private_key_file'] : '';
         $privateKeyPassword = isset($options['private_key_password']) ? (string) $options['private_key_password'] : '';
+        $digital = !isset($options['digital_signature']) || $options['digital_signature'];
 
-        if (!self::isConfigured($certificateFile, $privateKeyFile, $privateKeyPassword)) {
+        if ($digital && !self::isConfigured($certificateFile, $privateKeyFile, $privateKeyPassword)) {
             throw new Exception('OpenSSL certificate signer is not configured');
         }
 
         $extraCertificatesFile = '';
-        if (!empty($options['extra_certificates_file']) && is_readable($options['extra_certificates_file'])) {
+        if ($digital && !empty($options['extra_certificates_file']) && is_readable($options['extra_certificates_file'])) {
             $extraCertificatesFile = 'file://' . realpath($options['extra_certificates_file']);
         }
 
@@ -150,19 +153,21 @@ class PHPCertificateSigner
         $pdf->SetAuthor(!empty($options['author']) ? (string) $options['author'] : $name);
         $pdf->SetTitle(!empty($options['title']) ? (string) $options['title'] : basename((string) $inputPdf));
         $pdf->SetSubject($reason);
-        $pdf->setSignature(
-            'file://' . realpath($certificateFile),
-            'file://' . realpath($privateKeyFile),
-            $privateKeyPassword,
-            $extraCertificatesFile,
-            2,
-            array(
-                'Name' => $name,
-                'Location' => !empty($options['location']) ? (string) $options['location'] : 'Shared Hosting',
-                'Reason' => $reason,
-                'ContactInfo' => !empty($options['contact_info']) ? (string) $options['contact_info'] : '',
-            )
-        );
+        if ($digital) {
+            $pdf->setSignature(
+                'file://' . realpath($certificateFile),
+                'file://' . realpath($privateKeyFile),
+                $privateKeyPassword,
+                $extraCertificatesFile,
+                2,
+                array(
+                    'Name' => $name,
+                    'Location' => !empty($options['location']) ? (string) $options['location'] : 'Shared Hosting',
+                    'Reason' => $reason,
+                    'ContactInfo' => !empty($options['contact_info']) ? (string) $options['contact_info'] : '',
+                )
+            );
+        }
 
         $source = isset($options['input_pdf_data']) && $options['input_pdf_data'] !== ''
             ? \setasign\Fpdi\PdfParser\StreamReader::createByString((string) $options['input_pdf_data'])
@@ -210,7 +215,7 @@ class PHPCertificateSigner
             }
         }
 
-        if ($pageCount > 0) {
+        if ($digital && $pageCount > 0) {
             if ($image !== '') {
                 $pdf->setSignatureAppearance($x, $y, $width, $height, $signaturePage);
             } else {
@@ -220,7 +225,7 @@ class PHPCertificateSigner
 
         $pdf->Output($outputPdf, 'F');
 
-        return array('pageCount' => $pageCount, 'signaturePage' => $signaturePage);
+        return array('pageCount' => $pageCount, 'signaturePage' => $signaturePage, 'digitallySigned' => $digital);
     }
 
     public static function probeSignature($pdfPath)
