@@ -52,7 +52,7 @@ class PDFSignature
             return true;
         }
 
-        return file_exists($this->getDecryptFile($this->pathHash."/filename.txt"));
+        return $this->gpg->decryptToString(preg_replace("/\.(gpg|enc)$/", "", $this->pathHash."/filename.txt")) !== false;
     }
 
     public function isEncrypted() {
@@ -108,7 +108,8 @@ class PDFSignature
     }
 
     protected function isCompileLock() {
-        if(file_exists($this->lockFile) && filemtime($this->lockFile) > time() + 30) {
+        // a lock older than 30 seconds belongs to a crashed request
+        if(file_exists($this->lockFile) && filemtime($this->lockFile) < time() - 30) {
             unlink($this->lockFile);
         }
 
@@ -131,6 +132,9 @@ class PDFSignature
         }
 
         if($this->isCompileLock()) {
+            // wait for the other request instead of spinning on the CPU
+            usleep(100000);
+            clearstatcache(true, $this->lockFile);
             return $this->compile();
         }
 
@@ -161,11 +165,11 @@ class PDFSignature
     }
 
     protected function getShareState() {
-        $shareStateFile = $this->getDecryptFile($this->getShareStateFile());
-        if (!$shareStateFile || !file_exists($shareStateFile)) {
+        $contents = $this->gpg->decryptToString($this->getShareStateFile());
+        if ($contents === false) {
             return null;
         }
-        $state = json_decode(file_get_contents($shareStateFile), true);
+        $state = json_decode($contents, true);
         if (!is_array($state)) {
             return null;
         }
@@ -258,10 +262,10 @@ class PDFSignature
     public function getPublicFilename() {
         $filename = $this->hash.'.pdf';
 
-        $file = $this->getDecryptFile($this->pathHash."/filename.txt");
+        $contents = $this->gpg->decryptToString($this->pathHash."/filename.txt");
 
-        if(file_exists($file)) {
-            $filename = file_get_contents($file);
+        if($contents !== false) {
+            $filename = $contents;
         }
 
         $signatureCount = $this->getSignatureCount();
@@ -327,7 +331,7 @@ class PDFSignature
     public static function flatten($pdf)
     {
         // check version of imagick
-        $command = (null === shell_exec("command -v magick")) ? 'convert' : 'magick';
+        $command = ToolCheck::run('command -v magick', null) === false ? 'convert' : 'magick';
 
         shell_exec(sprintf(
             '%s -density 200 -units PixelsPerInch %s_signe.pdf -compress zip %s_signe.pdf'
@@ -344,27 +348,11 @@ class PDFSignature
     }
 
     public static function isrsvgConvertInstalled() {
-        $output = null;
-        $returnCode = null;
-
-        exec('rsvg-convert --version', $output, $returnCode);
-
-        if (!$output) {
-            return array(false);
-        }
-        return $output;
+        return ToolCheck::run('rsvg-convert --version', null) ?: array(false);
     }
 
     public static function ispdftkInstalled() {
-        $output = null;
-        $returnCode = null;
-
-        exec('pdftk --version', $output, $returnCode);
-
-        if (!$output) {
-            return array(false);
-        }
-        return $output;
+        return ToolCheck::run('pdftk --version', null) ?: array(false);
     }
 
 }

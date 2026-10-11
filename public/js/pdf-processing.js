@@ -74,6 +74,14 @@
             });
         }
 
+        function encodeAndRelease(canvas, quality) {
+            return canvasToBlob(canvas, 'image/jpeg', quality).then(function (blob) {
+                canvas.width = 0;
+                canvas.height = 0;
+                return blobToUint8Array(blob);
+            });
+        }
+
         function blobToUint8Array(blob) {
             return blob.arrayBuffer().then(function (arrayBuffer) {
                 return new Uint8Array(arrayBuffer);
@@ -112,13 +120,20 @@
                     canvasContext: context,
                     viewport: viewport
                 }).promise;
-                renderedPages.push({
+                page.cleanup();
+                var renderedPage = {
                     pageNumber: pageNumber,
                     canvas: canvas,
                     width: canvas.width,
                     height: canvas.height
-                });
+                };
+                if (options && options.encodeJpeg) {
+                    // encode while the next page renders, then free the canvas memory
+                    renderedPage.jpeg = encodeAndRelease(canvas, options.quality || 0.75);
+                }
+                renderedPages.push(renderedPage);
             }
+            pdf.destroy();
 
             return renderedPages;
         }
@@ -130,11 +145,14 @@
                 font = await pdfDoc.embedFont(window.PDFLib.StandardFonts.Helvetica);
             }
 
+            var quality = options && options.quality ? options.quality : 0.75;
+            var jpegs = await Promise.all(renderedPages.map(function (renderedPage) {
+                return renderedPage.jpeg || canvasToBlob(renderedPage.canvas, 'image/jpeg', quality).then(blobToUint8Array);
+            }));
+
             for (var pageIndex = 0; pageIndex < renderedPages.length; pageIndex++) {
                 var renderedPage = renderedPages[pageIndex];
-                var imageBlob = await canvasToBlob(renderedPage.canvas, 'image/jpeg', options && options.quality ? options.quality : 0.75);
-                var imageBytes = await blobToUint8Array(imageBlob);
-                var image = await pdfDoc.embedJpg(imageBytes);
+                var image = await pdfDoc.embedJpg(jpegs[pageIndex]);
                 var pdfPage = pdfDoc.addPage([renderedPage.width, renderedPage.height]);
 
                 pdfPage.drawImage(image, {
@@ -193,6 +211,8 @@
             var compressionPreset = getCompressionPreset(preset);
             var renderedPages = await renderPdfPages(file, {
                 scale: compressionPreset.scale,
+                quality: compressionPreset.quality,
+                encodeJpeg: true,
                 onProgress: options && options.onProgress ? options.onProgress : null
             });
 
@@ -220,8 +240,7 @@
                     if (options && typeof options.onProgress === 'function') {
                         options.onProgress({ step: 'recognize', page: pageIndex + 1, total: renderedPages.length });
                     }
-                    var dataUrl = renderedPages[pageIndex].canvas.toDataURL('image/png');
-                    var result = await worker.recognize(dataUrl);
+                    var result = await worker.recognize(renderedPages[pageIndex].canvas);
                     renderedPages[pageIndex].words = result && result.data && result.data.words ? result.data.words : [];
                 }
             } finally {

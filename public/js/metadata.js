@@ -1,5 +1,6 @@
 let pages = [];
 let pdfRenderTasks = [];
+let pageObserver = null;
 let pdffile = null
 let deletedMetadata = [];
 let isLocalPath = false;
@@ -91,11 +92,32 @@ async function loadPDF(pdfBlob) {
     document.querySelectorAll('.hiddenCanvasElement').forEach(function(item) {
         item.remove();
     });
+    // pages are rendered when they come close to the viewport instead of all at once
+    if(pageObserver) {
+        pageObserver.disconnect();
+    }
+    pageObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if(!entry.isIntersecting) {
+                return;
+            }
+            pageObserver.unobserve(entry.target);
+            pageRender(parseInt(entry.target.dataset.pageIndex));
+        });
+    }, { rootMargin: '1500px 0px' });
+    const containerWidth = document.getElementById('container-pages').offsetWidth;
     for(let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++ ) {
+        const containerPagePDF = document.createElement('div');
+        containerPagePDF.classList.add('page');
+        containerPagePDF.setAttribute('id', 'container-page-'+(pageNumber - 1));
+        containerPagePDF.dataset.pageIndex = pageNumber - 1;
+        document.getElementById('container-pages').appendChild(containerPagePDF);
         pdf.getPage(pageNumber).then(function(page) {
             let pageIndex = (page.pageNumber - 1);
             pages[pageIndex] = page;
-            pageRender(pageIndex);
+            const viewport = page.getViewport({scale: 1});
+            containerPagePDF.style.minHeight = Math.round(viewport.height * containerWidth / viewport.width) + 'px';
+            pageObserver.observe(containerPagePDF);
         });
     }
 
@@ -124,12 +146,12 @@ async function pageRender(pageIndex) {
 
   viewport = viewportWidth;
 
-  const containerPagePDF = document.createElement('div')
+  const containerPagePDF = document.getElementById('container-page-'+pageIndex)
   const canvasPDF = document.createElement('canvas')
   const wrapperPDF = document.createElement('div')
   const textPDF = document.createElement('div')
 
-  document.getElementById('container-pages').appendChild(containerPagePDF)
+  containerPagePDF.style.removeProperty('min-height')
   containerPagePDF.appendChild(wrapperPDF)
   wrapperPDF.appendChild(canvasPDF)
   wrapperPDF.appendChild(textPDF)
@@ -139,9 +161,6 @@ async function pageRender(pageIndex) {
   canvasPDF.height = viewport.height;
   canvasPDF.width = viewport.width;
   canvasPDF.classList.add('shadow-sm');
-
-  containerPagePDF.classList.add('page')
-  containerPagePDF.setAttribute('id', 'container-page-'+pageIndex)
 
   wrapperPDF.classList.add('canvasWrapper');
   wrapperPDF.style.position = 'relative'

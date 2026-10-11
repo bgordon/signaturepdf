@@ -3,15 +3,9 @@
 class Compression
 {
     public static function isgsInstalled() {
-        $output = null;
-        $returnCode = null;
+        $output = ToolCheck::run('gs --version');
 
-        exec('gs --version', $output, $returnCode);
-
-        if ($returnCode !== 0 || !$output) {
-            return array(false);
-        }
-        return $output;
+        return $output ?: array(false);
     }
 
     public static function isBrowserAvailable() {

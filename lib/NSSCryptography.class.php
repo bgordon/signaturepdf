@@ -181,22 +181,13 @@ class NSSCryptography
 
     public static function isCertUtilInstalled()
     {
-        $output = array();
-        $returnCode = 0;
-        exec('certutil -V 2>&1', $output, $returnCode);
-        if ($returnCode !== 0 && $returnCode !== 255) {
-            return false;
-        }
-
-        return 'OK';
+        return ToolCheck::run('certutil -V 2>&1', array(0, 255)) !== false ? 'OK' : false;
     }
 
     public static function isPDFSigInstalled()
     {
-        $output = array();
-        $returnCode = 0;
-        exec('pdfsig -v 2>&1', $output, $returnCode);
-        if ($returnCode !== 0 || empty($output[0])) {
+        $output = ToolCheck::run('pdfsig -v 2>&1');
+        if (!$output || empty($output[0])) {
             return false;
         }
 

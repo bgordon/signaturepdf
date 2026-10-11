@@ -16,6 +16,14 @@ This fork keeps the core signing workflow compatible with classic PHP shared hos
 - server-side SVG conversion stays optional
 - browser-generated PDFs are saved without object streams so the free FPDI parser can reopen them on shared hosting
 
+### Performance
+
+- external tools (gs, ocrmypdf, pdftk, rsvg-convert, certutil, pdfsig, ImageMagick, potrace) are detected once per hour and cached (`lib/ToolCheck.class.php`) instead of starting a process on every page view
+- `lib/` classes are loaded on demand
+- small encrypted metadata files (share state, file name) are decrypted in memory, no plaintext copies are left in the temp directory
+- browser compression encodes each page right after rendering and frees its canvas, so memory stays flat for long documents
+- the metadata editor renders pages when they scroll into view
+
 ### PHP certificate signer
 
 `lib/PHPCertificateSigner.class.php` signs PDFs with OpenSSL + TCPDF/FPDI only (no `pdfsig`, no NSS):

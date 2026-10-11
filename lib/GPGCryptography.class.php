@@ -40,7 +40,12 @@ class GPGCryptography
     private static function encryptContents($contents, $key) {
         $binaryKey = self::getBinaryKey($key);
 
-        if (in_array(self::OPENSSL_CIPHER, openssl_get_cipher_methods(), true)) {
+        static $gcm = null;
+        if ($gcm === null) {
+            $gcm = in_array(self::OPENSSL_CIPHER, openssl_get_cipher_methods(), true);
+        }
+
+        if ($gcm) {
             $iv = random_bytes(12);
             $tag = '';
             $ciphertext = openssl_encrypt($contents, self::OPENSSL_CIPHER, $binaryKey, OPENSSL_RAW_DATA, $iv, $tag);
@@ -137,6 +142,26 @@ class GPGCryptography
         return $decryptTmpFile;
     }
 
+    /**
+     * Decrypts $file into memory (for small metadata files such as share.json
+     * and filename.txt), so no plaintext copy is written to the temp directory.
+     * Returns the plaintext of an unencrypted file, or false.
+     */
+    public function decryptToString($file) {
+        $encryptedFile = $file.self::ENCRYPTED_EXTENSION;
+        if (!file_exists($encryptedFile)) {
+            $encryptedFile = $file.self::LEGACY_ENCRYPTED_EXTENSION;
+        }
+        if (!file_exists($encryptedFile)) {
+            return file_exists($file) ? file_get_contents($file) : false;
+        }
+        if (!$this->symmetricKey) {
+            return false;
+        }
+
+        return self::decryptContents(file_get_contents($encryptedFile), $this->symmetricKey);
+    }
+
     public function runDecryptFile($file, $outputFile) {
         $payload = file_get_contents($file);
         $contents = self::decryptContents($payload, $this->symmetricKey);
@@ -167,8 +192,16 @@ class GPGCryptography
             rmdir($element);
             return;
         }
-        $eraser = str_repeat(0, strlen(file_get_contents($element)));
-        file_put_contents($element, $eraser);
+        $size = filesize($element);
+        $handle = fopen($element, 'r+');
+        if ($handle) {
+            $chunk = str_repeat('0', 1048576);
+            for ($written = 0; $written < $size; $written += 1048576) {
+                fwrite($handle, $size - $written >= 1048576 ? $chunk : substr($chunk, 0, $size - $written));
+            }
+            fflush($handle);
+            fclose($handle);
+        }
         unlink($element);
     }
 

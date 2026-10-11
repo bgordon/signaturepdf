@@ -51,22 +51,28 @@ async function loadPDF(pdfBlob) {
             document.location = "/";
             return;
         }
+        let containersHtml = '';
+        let inputsHtml = '';
+        for(let pageIndex = 0; pageIndex < pdf.numPages; pageIndex++) {
+            inputsHtml += '<input name="svg[' + pageIndex + ']" id="data-svg-' + pageIndex + '" type="hidden" value="" />';
+            containersHtml += '<div class="position-relative mt-1 ms-1 me-1 d-inline-block" id="canvas-container-' + pageIndex +'"><canvas id="canvas-pdf-'+pageIndex+'" class="shadow-sm canvas-pdf"></canvas><div class="position-absolute top-0 start-0"><canvas id="canvas-edition-'+pageIndex+'"></canvas></div></div>';
+        }
+        document.getElementById('form_block').insertAdjacentHTML('beforeend', inputsHtml);
+        document.getElementById('container-pages').insertAdjacentHTML('beforeend', containersHtml);
+        const containerWidth = document.getElementById('container-pages').clientWidth - 40;
         for(let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++ ) {
             pdf.getPage(pageNumber).then(function(page) {
               let scale = 1.5;
               let viewport = page.getViewport({scale: scale});
-              if(viewport.width > document.getElementById('container-pages').clientWidth - 40) {
+              if(viewport.width > containerWidth) {
                   viewport = page.getViewport({scale: 1});
-                  scale = (document.getElementById('container-pages').clientWidth - 40) / viewport.width;
+                  scale = containerWidth / viewport.width;
                   viewport = page.getViewport({ scale: scale });
               }
 
               currentScale = scale;
 
               let pageIndex = page.pageNumber - 1;
-
-              document.getElementById('form_block').insertAdjacentHTML('beforeend', '<input name="svg[' + pageIndex + ']" id="data-svg-' + pageIndex + '" type="hidden" value="" />');
-              document.getElementById('container-pages').insertAdjacentHTML('beforeend', '<div class="position-relative mt-1 ms-1 me-1 d-inline-block" id="canvas-container-' + pageIndex +'"><canvas id="canvas-pdf-'+pageIndex+'" class="shadow-sm canvas-pdf"></canvas><div class="position-absolute top-0 start-0"><canvas id="canvas-edition-'+pageIndex+'"></canvas></div></div>');
 
               let canvasPDF = document.getElementById('canvas-pdf-' + pageIndex);
               let canvasEditionHTML = document.getElementById('canvas-edition-' + pageIndex);
@@ -83,8 +89,8 @@ async function loadPDF(pdfBlob) {
                 enhanceTextSelection: true
               };
               let renderTask = page.render(renderContext);
-              pdfRenderTasks.push(renderTask);
-              pdfPages.push(page);
+              pdfRenderTasks[pageIndex] = renderTask;
+              pdfPages[pageIndex] = page;
               let canvasEdition = new fabric.Canvas('canvas-edition-' + pageIndex, {
                 selection : false,
                 allowTouchScrolling: true
@@ -189,7 +195,7 @@ async function loadPDF(pdfBlob) {
                   toolBox.reset()
               });
               canvasEdition.on("object:modified", storeCustomText);
-              canvasEditions.push(canvasEdition);
+              canvasEditions[pageIndex] = canvasEdition;
             });
         }
     }, function (reason) {
@@ -241,16 +247,15 @@ async function buildSignedPdfBlob() {
         throw new Error('PDF file missing');
     }
 
-    var sourceFile = uploadInput.files[0];
-    var sourceBytes = await sourceFile.arrayBuffer();
-    var sourceDocument = await PDFLib.PDFDocument.load(sourceBytes);
     var outputDocument = await PDFLib.PDFDocument.create();
-    var sourcePages = sourceDocument.getPages();
+    var pageCount = pdfPages.length;
+    var pageSizes = [];
+    var jpegPromises = [];
     var pageIndex = 0;
 
-    for (pageIndex = 0; pageIndex < sourcePages.length; pageIndex++) {
-        var sourcePage = sourcePages[pageIndex];
-        var pageSize = sourcePage.getSize();
+    for (pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        var view = pdfPages[pageIndex].view;
+        var pageSize = { width: view[2] - view[0], height: view[3] - view[1] };
         var pdfCanvas = document.getElementById('canvas-pdf-' + pageIndex);
         var mergedCanvas = document.createElement('canvas');
         var mergedContext = mergedCanvas.getContext('2d');
@@ -269,15 +274,22 @@ async function buildSignedPdfBlob() {
         mergedContext.drawImage(pdfCanvas, 0, 0, mergedCanvas.width, mergedCanvas.height);
         mergedContext.drawImage(overlayCanvas, 0, 0, overlayWidth, overlayHeight, 0, 0, mergedCanvas.width, mergedCanvas.height);
 
-        var imageBlob = await canvasToBlobPromise(mergedCanvas, 'image/jpeg', 0.45);
-        var imageBytes = await imageBlob.arrayBuffer();
-        var image = await outputDocument.embedJpg(imageBytes);
-        var outputPage = outputDocument.addPage([pageSize.width, pageSize.height]);
+        pageSizes.push(pageSize);
+        jpegPromises.push(canvasToBlobPromise(mergedCanvas, 'image/jpeg', 0.45).then(function(blob) {
+            return blob.arrayBuffer();
+        }));
+    }
+
+    var jpegs = await Promise.all(jpegPromises);
+
+    for (pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        var image = await outputDocument.embedJpg(jpegs[pageIndex]);
+        var outputPage = outputDocument.addPage([pageSizes[pageIndex].width, pageSizes[pageIndex].height]);
         outputPage.drawImage(image, {
             x: 0,
             y: 0,
-            width: pageSize.width,
-            height: pageSize.height
+            width: pageSizes[pageIndex].width,
+            height: pageSizes[pageIndex].height
         });
     }
 
@@ -1333,8 +1345,16 @@ function createEventsListener() {
     if(pdfHash) {
         updateNbLayers();
         setInterval(function() {
+            if(document.hidden) {
+                return;
+            }
             updateNbLayers();
         }, 10000);
+        document.addEventListener('visibilitychange', function() {
+            if(!document.hidden) {
+                updateNbLayers();
+            }
+        });
     }
 };
 

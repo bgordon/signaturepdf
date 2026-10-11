@@ -1,13 +1,13 @@
 <?php
 
 setlocale(LC_ALL, "");
-require(__DIR__.'/lib/GPGCryptography.class.php');
-require(__DIR__.'/lib/PHPCertificateSigner.class.php');
-require(__DIR__.'/lib/NSSCryptography.class.php');
-require(__DIR__.'/lib/PDFSignature.class.php');
-require(__DIR__.'/lib/Image2SVG.class.php');
-require(__DIR__.'/lib/Compression.class.php');
-require(__DIR__.'/lib/OCR.class.php');
+// load lib/ classes on first use instead of parsing all of them on every request
+spl_autoload_register(function ($class) {
+    $file = __DIR__.'/lib/'.$class.'.class.php';
+    if (preg_match('/^[A-Za-z0-9]+$/', $class) && is_file($file)) {
+        require $file;
+    }
+});
 
 $f3 = require(__DIR__.'/vendor/fatfree/base.php');
 
@@ -160,7 +160,7 @@ $f3->route('GET /signature/@hash',
 
 $f3->route('POST /image2svg',
     function($f3) {
-        $files = Web::instance()->receive(function($file,$formFieldName){
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if(strpos(Web::instance()->mime($file['tmp_name'], true), 'image/') !== 0) {
 
                 return false;
@@ -216,7 +216,7 @@ $f3->route('POST /sign',
         unlink($tmpfile);
         $svgFiles = [];
 
-        $files = Web::instance()->receive(function($file,$formFieldName){
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if($formFieldName == "pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
                 $f3->error(403);
             }
@@ -303,7 +303,7 @@ $f3->route('POST /share',
         $svgFiles = [];
         $originalFile = $tmpfile."_original.pdf";
         $originalFileBaseName = null;
-        $files = Web::instance()->receive(function($file,$formFieldName){
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if($formFieldName == "pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
                 $f3->error(403);
             }
@@ -418,7 +418,7 @@ $f3->route('POST /signature/@hash/save',
         $tmpfile = tempnam($f3->get('UPLOADS'), 'pdfsignature_save_'.uniqid($hash, true));
         unlink($tmpfile);
         $svgFiles = [];
-        $files = Web::instance()->receive(function($file,$formFieldName){
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if($formFieldName == "svg" && strpos(Web::instance()->mime($file['tmp_name'], true), 'image/svg+xml') !== 0) {
                 $f3->error(403);
             }
@@ -464,6 +464,7 @@ $f3->route('GET /signature/@hash/nblayers',
             $signatureCount = count($pdfSignature->getLayers());
         }
         echo $signatureCount;
+        $pdfSignature->clean();
     }
 );
 
@@ -501,7 +502,7 @@ $f3->route('GET /metadata',
 $f3->route ('POST /ocr',
     function($f3) {
         $originalFilename = null;
-        $files = Web::instance()->receive(function($file,$formFieldName) {
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if ($formFieldName == "pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
                 $f3->error(403);
             }
@@ -565,7 +566,7 @@ $f3->route('GET /compress',
 $f3->route ('POST /compress',
     function($f3) {
         $originalFilename = null;
-        $files = Web::instance()->receive(function($file,$formFieldName) {
+        $files = Web::instance()->receive(function($file,$formFieldName) use ($f3) {
             if ($formFieldName == "pdf" && strpos(Web::instance()->mime($file['tmp_name'], true), 'application/pdf') !== 0) {
                 $f3->error(403);
             }

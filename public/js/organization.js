@@ -257,8 +257,16 @@ async function pageRender(pageIndex) {
     viewport: viewport,
   });
 
-  updateFormats();
+  if(!updateFormatsQueued) {
+    updateFormatsQueued = true;
+    requestAnimationFrame(function() {
+      updateFormatsQueued = false;
+      updateFormats();
+    });
+  }
 }
+
+let updateFormatsQueued = false;
 
 function getFileIndex(page) {
 
@@ -483,6 +491,8 @@ function isPageHover(page) {
 }
 
 function updatePageState(page) {
+    const selectionMode = isSelectionMode();
+    const draggedMode = isDraggedMode();
     page.classList.remove('border-primary', 'shadow-sm', 'bg-primary', 'border-secondary', 'bg-secondary');
     page.classList.add('border-transparent', 'bg-transparent');
     page.querySelector('.canvas-pdf').style.opacity = '1';
@@ -502,7 +512,7 @@ function updatePageState(page) {
     page.classList.remove('page-dragged');
     page.draggable = true;
 
-    if(isSelectionMode()) {
+    if(selectionMode) {
         page.draggable = false;
     }
 
@@ -510,25 +520,25 @@ function updatePageState(page) {
         page.querySelector('.canvas-pdf').style.opacity = '0.15';
     }
 
-    if(isPageHover(page) && !isPageDeleted(page) && !isPageDragged(page) && !isPageSelected(page) && !isDraggedMode()) {
+    if(isPageHover(page) && !isPageDeleted(page) && !isPageDragged(page) && !isPageSelected(page) && !draggedMode) {
         page.querySelector('.page-title').classList.remove('d-none');
         page.classList.add('border-secondary', 'bg-secondary');
         page.classList.remove('border-transparent', 'bg-transparent');
         page.querySelector('.btn-select').classList.remove('d-none')
     }
 
-    if(isPageHover(page) && !isPageDeleted(page) && !isPageDragged(page) && !isPageSelected(page) && !isDraggedMode() && !isSelectionMode()) {
+    if(isPageHover(page) && !isPageDeleted(page) && !isPageDragged(page) && !isPageSelected(page) && !draggedMode && !selectionMode) {
         page.querySelector('.btn-rotate').classList.remove('d-none');
         page.querySelector('.btn-download').classList.remove('d-none');
         page.querySelector('.btn-delete').classList.remove('d-none');
         page.querySelector('.btn-drag').classList.remove('d-none');
     }
 
-    if(isPageHover(page) && isPageDeleted(page) && !isDraggedMode()) {
+    if(isPageHover(page) && isPageDeleted(page) && !draggedMode) {
         page.querySelector('.btn-restore').classList.remove('d-none');
     }
 
-    if(is_mobile() && isPageDeleted(page) && !isDraggedMode()) {
+    if(is_mobile() && isPageDeleted(page) && !draggedMode) {
         page.querySelector('.btn-restore').classList.remove('d-none');
     }
 
@@ -546,7 +556,7 @@ function updatePageState(page) {
         page.querySelector('.canvas-pdf').classList.add('shadow');
     }
 
-    if(!isPageDragged(page) && !isPageDeleted(page) && isDraggedMode()) {
+    if(!isPageDragged(page) && !isPageDeleted(page) && draggedMode) {
         page.querySelector('.canvas-pdf').classList.add('opacity-50');
         page.querySelector('.btn-drag-here').classList.remove('d-none');
     }
