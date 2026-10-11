@@ -134,9 +134,8 @@ class SQL {
 			case \PDO::PARAM_BOOL:
 				return (bool)$val;
 			case \PDO::PARAM_STR:
-				return (string)$val;
 			case \PDO::PARAM_LOB:
-				return (binary)$val;
+				return (string)$val;
 		}
 	}
 
@@ -236,7 +235,7 @@ class SQL {
 					// Statement-level error occurred
 					if ($this->trans)
 						$this->rollback();
-					user_error('PDOStatement: '.$error[2],E_USER_ERROR);
+                    throw new \Exception('PDOStatement: '.$error[2]);
 				}
 				if (preg_match('/(?:^[\s\(]*'.
 					'(?:WITH|EXPLAIN|SELECT|PRAGMA|SHOW)|RETURNING)\b/is',$cmd) ||
@@ -265,7 +264,7 @@ class SQL {
 				// PDO-level error occurred
 				if ($this->trans)
 					$this->rollback();
-				user_error('PDO: '.$error[2],E_USER_ERROR);
+                throw new \Exception('PDO: '.$error[2]);
 			}
 
 		}
@@ -399,6 +398,7 @@ class SQL {
 		if (is_string($fields))
 			$fields=\Base::instance()->split($fields);
 		$conv=[
+            '^enum|^set'=>\PDO::PARAM_STR,
 			'int\b|integer'=>\PDO::PARAM_INT,
 			'bool'=>\PDO::PARAM_BOOL,
 			'blob|bytea|image|binary'=>\PDO::PARAM_LOB,
@@ -435,8 +435,7 @@ class SQL {
 					$cache->set($hash,$rows,$ttl);
 				return $rows;
 			}
-		user_error(sprintf(self::E_PKey,$table),E_USER_ERROR);
-		return FALSE;
+        throw new \Exception(sprintf(self::E_PKey,$table));
 	}
 
 	/**
@@ -544,8 +543,12 @@ class SQL {
 		if (!$options)
 			$options=[];
 		if (isset($parts[0]) && strstr($parts[0],':',TRUE)=='mysql')
-			$options+=[\PDO::MYSQL_ATTR_INIT_COMMAND=>'SET NAMES '.
-				strtolower(str_replace('-','',$fw->ENCODING)).';'];
+			if (version_compare(PHP_VERSION, '8.5.0')<0)
+				$options+=[\PDO::MYSQL_ATTR_INIT_COMMAND=>'SET NAMES '.
+					strtolower(str_replace('-','',$fw->ENCODING)).';'];
+			else
+				$options+=[\PDO\Mysql::ATTR_INIT_COMMAND=>'SET NAMES '.
+					strtolower(str_replace('-','',$fw->ENCODING)).';'];
 		$this->pdo=new \PDO($dsn,$user,$pw,$options);
 		$this->engine=$this->pdo->getattribute(\PDO::ATTR_DRIVER_NAME);
 	}

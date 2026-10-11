@@ -1,5 +1,28 @@
 CHANGELOG
 
+3.9.3 (22.07.2026)
+---
+*	fix: proper enum detection in db schema, #410, #409
+*	fix: Web->curl, allow TLS cert verification configuration, #412
+*	fix: match headers case-insensitive, #414
+*	fix: smtp deprecation notice str_replace
+*	fix: PHP 8.2 deprecation: avoid dynamic properties on ArrayObject in recursive()
+*	fix: PHP 8.5 deprecation raised by $http_response_header,
+
+3.9.2 (02.12.2025)
+---
+*	feat, Audit: Added bot/AI detection, #401
+*	fix: php 8.5 compatibility
+
+3.9.1 (09.08.2025)
+---
+*	fix: return type hint for unserialize, closes [#391](https://github.com/f3-factory/fatfree-core/issues/391)
+*	feat: Web->slug, specify the separator, [#397](https://github.com/f3-factory/fatfree-core/issues/397)
+*	feat: added hive pull method, [#395](https://github.com/f3-factory/fatfree-core/issues/395)
+*	fix: throw exceptions instead of deprecated USER_ERROR [#393](https://github.com/f3-factory/fatfree-core/issues/393)
+*	fix: error thrown by `read()` for cache, [#392](https://github.com/f3-factory/fatfree-core/issues/392)
+*	fix: failsafe when passing null to explode parameter
+
 3.9.0 (29.12.2024)
 ---
 *	feat [#377], DB\SQL: check TABLE_SCHEMA in fields introspection query
