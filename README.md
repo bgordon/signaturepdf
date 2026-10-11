@@ -7,7 +7,7 @@ Free web software for signing (alone or with others), organizing (merge, sort, r
 
 ## Shared-hosting compatibility
 
-This fork keeps the core signing workflow compatible with classic PHP shared hosting such as All-Inkl:
+This fork keeps the core signing workflow compatible with classic PHP shared hosting:
 
 - PDF signing and multi-signature sharing are generated in the browser with `pdf-lib`
 - shared-storage encryption uses native PHP OpenSSL instead of `gpg`
@@ -15,6 +15,27 @@ This fork keeps the core signing workflow compatible with classic PHP shared hos
 - OCR and compression fall back to browser processing when server binaries are unavailable
 - server-side SVG conversion stays optional
 - browser-generated PDFs are saved without object streams so the free FPDI parser can reopen them on shared hosting
+
+### PHP certificate signer
+
+`lib/PHPCertificateSigner.class.php` signs PDFs with OpenSSL + TCPDF/FPDI only (no `pdfsig`, no NSS):
+
+- certificate and key are parsed once; the result is cached per request and in a small stamp file in the system temp directory (keyed on path, size and modification time), so status checks on every page view stay below 1 ms
+- `sign()` accepts a file path or the PDF content as string (`input_pdf_data`) and can place a visible signature image (`signature_image` path or `signature_image_data` PNG binary, `signature_page`, `signature_x/y/width/height`, `signature_caption`, `signature_date`) without temporary files
+- `ensureSelfSignedCertificate($certificateFile, $privateKeyFile, $password, $subject)` creates a self-signed RSA-2048 certificate when none exists yet
+
+```php
+PHPCertificateSigner::ensureSelfSignedCertificate('/path/to/cert.pem', '/path/to/key.pem', 'password', array('commonName' => 'My Signer'));
+PHPCertificateSigner::sign('', '/path/to/signed.pdf', array(
+    'certificate_file' => '/path/to/cert.pem',
+    'private_key_file' => '/path/to/key.pem',
+    'private_key_password' => 'password',
+    'input_pdf_data' => $pdfString,
+    'signature_image_data' => $pngBinary,
+    'name' => 'Signer name',
+    'reason' => 'Contract signed',
+));
+```
 
 This means the application can still sign PDFs, run the shared-sign flow, compress PDFs and generate OCR PDFs even when `pdftk`, `rsvg-convert`, `pdfsig`, `certutil`, `ocrmypdf` or `gpg` are unavailable.
 

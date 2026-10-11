@@ -233,6 +233,7 @@ class NSSCryptography
     private function canUsePhpBackend()
     {
         return $this->hasPhpConfiguration()
+            && PHPCertificateSigner::isSupported()
             && PHPCertificateSigner::isConfigured(
                 $this->certificate_file,
                 $this->private_key_file,
